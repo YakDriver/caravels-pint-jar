@@ -1,20 +1,66 @@
-var MAX_ERRORS = 10;
-var MAX_TRIGGERS = 1000;
-var STATUS_EVERY = 10000;
-var POST_TRIGGER_MILLIS = 500;
+const MAX_ERRORS = 10;
+const MAX_TRIGGERS = 3000;
+const STATUS_EVERY = 10000;
+const POST_TRIGGER_MILLIS = 500;
+const LOAD_STALLED_AFTER = 20000;
+
 var count = 0;
 var errorCount = 0;
+var justErrored = false;
 var quit = false;
-var tab = Math.floor(Math.random() * 2);
+var tab = randBetween(0,2);
 var millis = (new Date()).getTime();
 var averageShorts = [];
+var justLoaded = true;
+var justBegun = true;
+
+var blacklist = [
+    '451053852',
+    'aboutrecht',
+    'alessandrofabbriartist',
+    'alincms',
+    'benjaminsurinphotographe',
+    'cangyan',
+    'dibrein',
+    'dorianodisalvo',
+    'fotokrelles',
+    'freedomtophotograph',
+    'iso52',
+    'javier_rodriguez75',
+    'jeffwetltd',
+    'kamilpielkaphotography',
+    'lb423studio',
+    'mk-pixelstorm',
+    'motomotogpa',
+    'ptittomtompics',
+    'r2moficial',
+    'regards-libres',
+    'renesch',
+    'samueljacquatphotographie',
+    'sletanis',
+    'sophievonbuer',
+    'spasnemerov',
+    'sr_jasab',
+    'willymalbosc',
+    'zenofoto',
+];
+
+function getBlacklistSelector() {
+    var arr = []
+    blacklist.forEach(function (val) {
+        arr.push("[href*=" + val + "]");
+    });
+    return arr.join(",");
+}
 
 function getCompletion() {
     return Math.round(count * 100.0 / MAX_TRIGGERS);
 }
 
 function showStatus() {
-    console.log("Status " + getCompletion() + "%");
+    console.log(
+        "Status " + getCompletion() + "% (" + count + ") (tab: "
+        + (tab == 2 ? 3 : tab) + ") (doc ht:" + $(document).height() + ")");
 }
 
 function start() {
@@ -25,8 +71,13 @@ function start() {
 
 function end() {
     console.log("Completed " + count + " out of " + MAX_TRIGGERS + " (" + getCompletion() + "%)");
+    console.log("Error count: " + errorCount);
     d = new Date();
     console.log("Done at " + d + ".");
+}
+
+function randBetween(low, high) {
+    return Math.floor(Math.random() * (high - low + 1)) + low;
 }
 
 function success(e) {
@@ -62,75 +113,135 @@ function analyzeShort(e) {
     }
 }
 
-function sleep(ms) {
+function sleeping(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function doMenu(menu) {
+async function loading() {
+    await sleeping(200);
+    startLoad = (new Date()).getTime();
+    while ($("div.infinite_scroll_loader").css("display") == "block") {
+        await sleeping(500);
+        if ((new Date()).getTime() > (startLoad + LOAD_STALLED_AFTER)) {
+            console.log("Loading stalled");
+            $("ul.px_tabs li:eq((tab + 1) % 3) a").trigger("click");
+            await sleeping(3000);
+            $("ul.px_tabs li:eq(tab) a").trigger("click");
+            await sleeping(5000);
+            break;
+        }
+    }
+    await sleeping(1000);
+}
+
+async function scrolling(skrols = 3) {
+    console.log("Scrolling " + skrols + "...");
+    for (i = 0; i < skrols && !quit; i++) {
+        await loading();
+        window.scrollTo(0, $(document).height() * 2);
+        await loading();
+    }
+    justLoaded = true;
+}
+
+async function doingMenu(menu) {
+    console.log("Changing menu: " + menu);
+    await loading();
     e = $("div.discovery_" + menu + "__target").trigger("click");
     s = success(e); e = null;
     if (s) {
-        await sleep(1000);
-        choice = Math.floor(Math.random() * 2);
+        await loading();
+        choice = randBetween(0, 1);
         f = $("div." + menu + "_options ul li:eq(" + choice + ") a").trigger("click");
+        if (success(f)) {
+            await loading();
+        }
         f = null;
     }
 }
 
-async function navigate() {
-    switch (Math.floor(Math.random() * 6)) {
+async function switchingTab() {
+    oldTab = tab;
+    tab = (tab + 1) % 3;
+    console.log("Switching tabs (" + (oldTab == 2 ? "3" : oldTab) + "->" + (tab == 2 ? "3" : tab) + ")...");
+    await loading();
+
+    e = $("ul.px_tabs li:eq(" + (tab == 2 ? "3" : tab) + ") a").trigger("click");
+
+    await loading();
+    e = null;
+    justLoaded = true;
+}
+
+async function navigating() {
+    option = randBetween(0, 4);
+    if (tab == 2) {
+        option = 0;
+    }
+    switch (option) {
         case 0:
-        case 1:
-        case 2:
-        case 3:
-            console.log("Scrolling...");
-            window.scrollTo(0, $(document).height() - $(window).height());
-            break;
-        case 4:
-            console.log("Switching tabs...");
-            e = $("ul.px_tabs li:eq(" + tab + ") a").trigger("click");
-            e = null;
-            tab = (tab + 1) % 2;
+            await switchingTab();
+            await scrolling(randBetween(2, 4));
             break;
         default:
             console.log("Picking menu option...");
-            if (tab == 1 || Math.floor(Math.random() * 2) < 1) { // 50% goes here
-                await doMenu("followers");
-            } else {
-                await doMenu("sort");
+            option2 = randBetween(1, 2);
+            switch (option2) {
+                case 1: // menu 1 - tab 0,1
+                    if (tab == 2) {
+                        console.log("Cannot change menu");
+                    } else {
+                        await doingMenu("followers");
+                    }
+                    await scrolling(2);
+                    break;
+                case 2: // menu 2 - tab 0
+                    if (tab == 0) {
+                        await doingMenu("sort");
+                    } else {
+                        console.log("Cannot change sort menu");
+                    }
+                    await scrolling(2);
+                    break;
             }
     }
-    await sleep(1000);
-
-    for (i = 0; i < 20; i++) {
-        e = $("div.finished");
-        s = success(e); e = null;
-        if (s) {
-            break;
-        }
-        await sleep(1000);
-    }
-
-    await sleep(5000);
-    console.log("done.");
+    justLoaded = true;
 }
 
-async function forget() {
+async function forgetting() {
     if (quit) {
         end();
         return Promise.resolve('quitting');
     }
 
-    e = $("a.button.new_fav:not(.hearted):first");
+    if (justBegun) {
+        justBegun = false;
+        await switchingTab();
+    }
+
+    var delay = 500;
+    if (justLoaded) {
+        justLoaded = false;
+        delay = 3000 + Math.floor(($(document).height() / 150000) * 1000);
+    }
+    await sleeping(delay);
+    e = $("div.photo_thumbnail:not(.nsfw_placeholder) a.avatar:not(" + getBlacklistSelector() + ")")
+        .parents("div.photo_thumbnail")
+        .find("a.button.new_fav:not(.hearted)")
+        .first();
+
     if (!success(e)) {
         e = null;
         console.log("Nothing found!");
-        await navigate();
+        await scrolling(2);
     } else {
         count++;
         analyzeShort(e);
-        e.trigger("click");
-        await sleep(POST_TRIGGER_MILLIS);
+        f = e.parents("div.photo_thumbnail").find("a.photo_link");
+        if (!e.hasClass("hearted")) {
+            e.trigger("click");
+        }
+        await sleeping(POST_TRIGGER_MILLIS);
         e = null;
     }
 
@@ -140,13 +251,22 @@ async function forget() {
         millis = now;
     }
 
-    if (count >= MAX_TRIGGERS) {
+    if (justErrored) {
+        justErrored = false;
+        await navigating();
+    } else if (count >= MAX_TRIGGERS) {
         quit = true;
     } else {
-        await sleep(Math.floor(Math.random() * 1001) + 500);
+        if (randBetween(0, 500) == 0
+            || (randBetween(0, 49) == 0 && $(document).height() > 200000)
+            || (randBetween(0, 9) == 0 && $(document).height() > 300000)) {
+            await navigating();
+        } else if (randBetween(0, 99) == 0) {
+            await scrolling(1);
+        }
     }
 
-    await forget();
+    await forgetting();
 }
 
 $(function () {
@@ -162,9 +282,10 @@ $(function () {
             if (errorCount >= MAX_ERRORS) {
                 quit = true;
             }
+            justErrored = true;
         }
     });
 });
 
 start();
-forget();
+forgetting();

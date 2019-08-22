@@ -1,6 +1,6 @@
-// enskild
+// undo enskild
 var MAX_ERRORS = 10;
-var MAX_TRIGGERS = randBetween(20, 50);
+var MAX_TRIGGERS = 1000;
 var STATUS_EVERY = 10000;
 var count = 0;
 var errorCount = 0;
@@ -22,7 +22,7 @@ function showStatus() {
 function start() {
     var d = new Date();
     console.log("Beginning at " + d + "...");
-    console.log("Attempting to get " + MAX_TRIGGERS);
+    console.log("Attempting to undo " + MAX_TRIGGERS);
 }
 
 function end() {
@@ -60,7 +60,8 @@ async function forget() {
         return Promise.resolve('quitting');
     }
 
-    e = $("a.button.new_fav:not(.hearted):first").trigger("click");
+    await sleep(500);
+    e = $("a.button.new_fav.hearted:first").trigger("click");
     s = success(e); e = null;
     if (!s) {
         console.log("Nothing found!");

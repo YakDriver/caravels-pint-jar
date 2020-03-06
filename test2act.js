@@ -1,23 +1,13 @@
 // enskild
 var MAX_ERRORS_ENSKILD = 10;
-//var MAX_TRIGGERS = getMaxTriggers(18.48);
-var MAX_TRIGGERS = 200;
+var MAX_TRIGGERS = randBetween(30, 50)
 var STATUS_EVERY = 10000;
+var LOAD_STALLED_AFTER = 20000;
+
 var count = 0;
 var errorCount = 0;
 var quit = false;
 var millis = (new Date()).getTime();
-
-function getMaxTriggers(d) {
-    let lo = 1;
-    let hi = 5;
-    if (d > 16) {
-        lo = Math.round((d - 16) * 10);
-        hi = lo + Math.round((d - 16) * 3);
-
-    }
-    return randBetween(lo, hi);
-}
 
 function randBetween(low, high) {
     return Math.floor(Math.random() * (high - low + 1)) + low;
@@ -31,15 +21,28 @@ function showStatus() {
     console.log("Completed " + getCompletion() + "%");
 }
 
+async function loading() {
+    await sleeping(200);
+    let startLoad = (new Date()).getTime();
+    while ($("div.infinite_scroll_loader").css("display") == "block") {
+        await sleeping(500);
+        if ((new Date()).getTime() > (startLoad + LOAD_STALLED_AFTER)) {
+            console.log("Loading stalled");
+            quit = true;
+            break;
+        }
+    }
+}
+
 function start() {
-    var d = new Date();
+    let d = new Date();
     console.log("Beginning at " + d + "...");
     console.log("Attempting to get " + MAX_TRIGGERS);
 }
 
 function end() {
     console.log("Completed " + count + " out of " + MAX_TRIGGERS + " (" + getCompletion() + "%)");
-    d = new Date();
+    let d = new Date();
     console.log("Done at " + d + ".");
 }
 
@@ -52,58 +55,47 @@ function success(e) {
     return false;
 }
 
-function scroll() {
+async function scrolling() {
     console.log("Scrolling...");
-    before = window.scrollY;
+    let before = window.scrollY;
+    await loading();
     window.scrollTo(0, $(document).height() - $(window).height());
+    await loading();
     if (before == window.scrollY) {
-        return false;
+        console.log("Scroll failed");
+        quit = true;
     }
-    return true;
+    await sleeping(1000);
 }
 
-function sleep(ms) {
+function sleeping(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function forget() {
-    // count < 10 = 1:10; 10 < count < 100 = 1:20; 100 < count < 500 = 1:100
-    if (randBetween(1, Math.min(10, count / 5)) == 1) {
-        await scroll();
-        await sleep(1000);
-    }
-
-    if (quit) {
-        end();
-        return Promise.resolve('quitting');
-    }
-
-    e = $("a.button.new_fav:not(.hearted):first").trigger("click");
-    s = success(e); e = null;
-    if (!s) {
-        console.log("Nothing found!");
-        if (!scroll()) {
-            quit = true;
+    while (!quit && count < MAX_TRIGGERS) {
+        let e = $("a.button.new_fav:not(.hearted):first").trigger("click");
+        let s = success(e); e = null;
+        if (!s) {
+            console.log("Nothing found!");
+            await scrolling();
         } else {
-            await sleep(4000);
+            count++;
         }
-    } else {
-        count++;
+
+        let now = (new Date()).getTime();
+        if (now > (millis + STATUS_EVERY)) {
+            showStatus();
+            millis = now;
+        }
+
+        if (!quit) {
+            await sleeping(randBetween(500, 1500));
+        }
     }
 
-    now = (new Date()).getTime();
-    if (now > (millis + STATUS_EVERY)) {
-        showStatus();
-        millis = now;
-    }
-
-    if (quit || count >= MAX_TRIGGERS) {
-        quit = true;
-    } else {
-        await sleep(randBetween(500, 1500));
-    }
-
-    await forget();
+    end();
+    return Promise.resolve('quitting');
 }
 
 $(function () {
@@ -123,5 +115,13 @@ $(function () {
     });
 });
 
-start();
-forget();
+async function go() {
+    count = 0;
+    errorCount = 0;
+    quit = false;
+    millis = (new Date()).getTime();
+    start();
+    forget();
+}
+
+go();

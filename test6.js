@@ -1,23 +1,11 @@
 // enskild
-var MAX_ERRORS_ENSKILD = 10;
-//var MAX_TRIGGERS = getMaxTriggers(18.48);
-var MAX_TRIGGERS = 200;
+var MAX_ERRORS = 10;
+var MAX_TRIGGERS = 20;
 var STATUS_EVERY = 10000;
 var count = 0;
 var errorCount = 0;
 var quit = false;
 var millis = (new Date()).getTime();
-
-function getMaxTriggers(d) {
-    let lo = 1;
-    let hi = 5;
-    if (d > 16) {
-        lo = Math.round((d - 16) * 10);
-        hi = lo + Math.round((d - 16) * 3);
-
-    }
-    return randBetween(lo, hi);
-}
 
 function randBetween(low, high) {
     return Math.floor(Math.random() * (high - low + 1)) + low;
@@ -67,16 +55,17 @@ function sleep(ms) {
 }
 
 async function forget() {
-    // count < 10 = 1:10; 10 < count < 100 = 1:20; 100 < count < 500 = 1:100
-    if (randBetween(1, Math.min(10, count / 5)) == 1) {
-        await scroll();
-        await sleep(1000);
-    }
-
     if (quit) {
         end();
         return Promise.resolve('quitting');
     }
+
+    e = $("a.photo_link:eq(0)").trigger("click");
+
+    //https://api.500px.com/v1/photos?feature=user&stream=photos&user_id=71602189&include_states=true&image_size%5B%5D=1&image_size%5B%5D=2&image_size%5B%5D=32&image_size%5B%5D=31&image_size%5B%5D=33&image_size%5B%5D=34&image_size%5B%5D=35&image_size%5B%5D=36&image_size%5B%5D=2048&image_size%5B%5D=4&image_size%5B%5D=14&page=1&rpp=50
+    //<meta content='82.7' property='five_hundred_pixels:highest_rating'></meta>
+    f = $("meta[property='five_hundred_pixels:highest_rating']");
+    pulse = Math.round(parseFloat(h.text().trim()));
 
     e = $("a.button.new_fav:not(.hearted):first").trigger("click");
     s = success(e); e = null;
@@ -85,7 +74,7 @@ async function forget() {
         if (!scroll()) {
             quit = true;
         } else {
-            await sleep(4000);
+            await sleep(1000);
         }
     } else {
         count++;
@@ -116,7 +105,7 @@ $(function () {
             } else {
                 console.log(x.status + " error, status: " + status); //general error
             }
-            if (errorCount >= MAX_ERRORS_ENSKILD) {
+            if (errorCount >= MAX_ERRORS) {
                 quit = true;
             }
         }
@@ -125,3 +114,4 @@ $(function () {
 
 start();
 forget();
+

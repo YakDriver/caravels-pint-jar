@@ -2,7 +2,7 @@ const MAX_ERRORS = 10;
 const STANDARD_SLEEP = 1000;
 const STANDARD_SHORT_SLEEP = Math.floor(STANDARD_SLEEP / 2);
 const MULTI_TRIES = 8;
-const SELECT_OUT = true;
+const SELECT_OUT = false;
 
 var errorCount = 0;
 var quit = false;
@@ -52,7 +52,7 @@ function success(e) {
     return false;
 }
 
-function sleep(ms) {
+function sleeping(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -79,11 +79,11 @@ function inBoth(a, b) {
 }
 
 async function loading() {
-    await sleep(100);
+    await sleeping(100);
     while ($("li.infinite_scroll_loader").css("display") == "block") {
-        await sleep(500);
+        await sleeping(500);
     }
-    await sleep(1000);
+    await sleeping(1000);
 }
 
 async function waitForFinished() {
@@ -93,12 +93,12 @@ async function waitForFinished() {
         if (s) {
             break;
         }
-        await sleep(STANDARD_SHORT_SLEEP);
+        await sleeping(STANDARD_SHORT_SLEEP);
     }
-    await sleep(STANDARD_SLEEP);
+    await sleeping(STANDARD_SLEEP);
 }
 
-function getItemsSelector(out) {
+function getItemsSelector() {
     //return "li.actor" + (out ? ".following" : "");
     return "li.actor";
 }
@@ -111,7 +111,7 @@ async function findAll(out, skrol, items) {
 
         backOff = 200;
         do {
-            await sleep(backOff);
+            await sleeping(backOff);
             backOff *= 2;
         } while (skrol == null && (backOff < STANDARD_SLEEP * 10));
 
@@ -119,36 +119,34 @@ async function findAll(out, skrol, items) {
 
         await loading();
 
-        items = $(getItemsSelector(out));
+        items = $(getItemsSelector());
         if (items.length == lengthBefore) {
             multi_try += out ? 2 : 1;
         }
     } while (items.length > lengthBefore || multi_try < MULTI_TRIES);
 
-    await sleep(STANDARD_SLEEP);
+    await sleeping(STANDARD_SLEEP);
 }
 
-async function openModal(out) {
-    if (out) {
-        $("ul li.following").trigger("click");
-    } else {
-        $("ul li.followers").trigger("click");
-    }
+async function openVotes() {
+    let a = $("div a[data-id='photo-likes-count']");
+    a[0].click();
 
-    await sleep(STANDARD_SLEEP * 2);
+    await sleeping(STANDARD_SLEEP * 2);
 
-    var e = $("div.follower_modal div.info.list.scroll");
+    var e = $("div.ant-modal div.ant-modal-body")[0];
+    
     while (!success(e)) {
         console.log("Didn't find modal. Trying again...");
-        await sleep(STANDARD_SLEEP * 2);
-        e = $("div.follower_modal div.info.list.scroll");
+        await sleeping(STANDARD_SLEEP * 2);
+        e = $("div.ant-modal div.ant-modal-body div");
     }
 
-    arr = $(getItemsSelector(out));
+    arr = $(getItemsSelector());
 
     await findAll(out, e, arr);
 
-    arr = $(getItemsSelector(out));
+    arr = $(getItemsSelector());
 
     console.log("Found all");
 
@@ -181,14 +179,14 @@ async function getInfo(out) {
         f = null;
     });
 
-    await sleep(STANDARD_SHORT_SLEEP);
+    await sleeping(STANDARD_SHORT_SLEEP);
 
-    e = $("div.follower_modal div.close");
+    e = $("div.ant-modal-content button.ant-modal-close");
     if (success(e)) {
         e.trigger("click");
     }
 
-    await sleep(STANDARD_SLEEP * 2);
+    await sleeping(STANDARD_SLEEP * 2);
 }
 
 function analyze() {
